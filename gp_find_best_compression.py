@@ -47,7 +47,7 @@ WEIGHTS = {
 compressions = {
     'RLE_TYPE': [1, 2, 3, 4],
     'ZLIB': [1, 5, 9],
-    'ZSTD': [1, 10, 19]
+    'ZSTD': [1, 5, 9, 15, 19]
 }
 
 
@@ -58,6 +58,7 @@ def is_current_compression_method(original_column_info, column_info):
 def out_info(results, original_column_info):
     sorted_results = sorted(results, key=lambda k: k['size'])
     current_column = {'size': sorted_results[0]['size']}
+
     for column_info in sorted_results:
         if is_current_compression_method(original_column_info, column_info):
             current_column = column_info
@@ -66,15 +67,27 @@ def out_info(results, original_column_info):
 
     for column_info in sorted_results:
         current_text = ''
-        if  column_info == current_column:
+        if column_info == current_column:
             current_text = '<<<'
         if current_column:
             diff = str(round(100.0 / current_column['size'] * column_info['size'], 2)) + ' %'
-            summary_table.add_row([column_info['column_name'], column_info['compresstype'], column_info['compresslevel'],
-                                  column_info['size_h'], diff, current_text])
+            summary_table.add_row([
+                column_info['column_name'],
+                column_info['compresstype'],
+                column_info['compresslevel'],
+                column_info['size_h'],
+                diff,
+                current_text
+            ])
         else:
-            summary_table.add_row([column_info['column_name'], column_info['compresstype'], column_info['compresslevel'],
-                                  column_info['size_h'], '', current_text])
+            summary_table.add_row([
+                column_info['column_name'],
+                column_info['compresstype'],
+                column_info['compresslevel'],
+                column_info['size_h'],
+                '',
+                current_text
+            ])
 
     print(summary_table)
 
@@ -93,7 +106,7 @@ def bench_column(config, column):
                   compresstype={compresstype},
                   compresslevel={compresslevel}
                 )
-                AS (SELECT {column_name} from {schema}.{table} LIMIT {lines})
+                AS (SELECT "{column_name}" from {schema}.{table} LIMIT {lines})
             """.format(compresstype=compress_type, compresslevel=compress_level, column_name=column['column_name'], schema=config['schema'], table=config['table'], lines=config['lines'])
             run_query(curr, create_test_table)
 
@@ -173,18 +186,16 @@ def make_magic(config):
     results = Pool(config['threads']).starmap(bench_column, thread_params)
     sorted_as_source_table = sorted(results, key=lambda k: k[0]['attnum'])
 
-    column_sqls = []
+    column_list = []
     for column_info in sorted_as_source_table:
         best_colum_format = get_best_column_format(column_info, config)
-        sql = 'COLUMN {column_name} ENCODING (compresstype={compresstype}, COMPRESSLEVEL={compresslevel})'.format(**best_colum_format)
-        column_sqls.append(sql)
+        sql = 'COLUMN "{column_name}" ENCODING (compresstype={compresstype}, COMPRESSLEVEL={compresslevel})'.format(**best_colum_format)
+        column_list.append(sql)
 
     suggested_sql = """
-        SET search_path TO {schema};
-
-        CREATE TABLE {table}_new_type (
-          LIKE {table},
-          {column_sqls}
+        CREATE TABLE {schema}.{table}_new_type (
+            LIKE {schema}.{table},
+            {column_list}
         )
         WITH (
           appendonly=true,
@@ -192,17 +203,15 @@ def make_magic(config):
           compresstype=RLE_TYPE,
           COMPRESSLEVEL=3
         );
-        INSERT INTO {table}_new_type SELECT * FROM {table};
+        
+        INSERT INTO {schema}.{table}_new_type SELECT * FROM {schema}.{table};
         ANALYZE {table}_new_type;
 
+        ALTER TABLE {schema}.{table} RENAME TO {schema}.{table}_old;
+        ALTER TABLE {schema}.{table}_new_type RENAME TO {schema}.{table};
 
-        --CHECK INDEXES
-        BEGIN;
-        ALTER TABLE {table} RENAME TO {table}_old;
-        ALTER TABLE {table}_new_type RENAME TO {table};
-        COMMIT;
 
-    """.format(schema=config['schema'], table=config['table'], column_sqls=',\n'.join(column_sqls))
+    """.format(schema=config['schema'], table=config['table'], column_list=',\n'.join(column_list))
     print(suggested_sql)
 
 
@@ -214,7 +223,7 @@ if __name__ == "__main__":
     parser.add_argument("--user", type=str, help="username", default='gpadmin')
     parser.add_argument("--password", type=str, help="password")
 
-    parser.add_argument("--database", type=str, help="db name", default="db")
+    parser.add_argument("--database", type=str, help="db name", default="adb")
     parser.add_argument("-t", "--table", type=str, help="table name", required=True)
     parser.add_argument("-s", "--schema", type=str, help="schema name", required=True)
     parser.add_argument("-l", "--lines", type=str, help="rows to examine", default=10000000)
