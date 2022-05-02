@@ -47,7 +47,7 @@ WEIGHTS = {
 compressions = {
     'RLE_TYPE': [1, 2, 3, 4],
     'ZLIB': [1, 5, 9],
-    'ZSTD': [1, 5, 9, 15, 19]
+    'ZSTD': [1, 10, 19]
 }
 
 
@@ -211,7 +211,7 @@ def make_magic(config):
         ALTER TABLE {schema}.{table}_new_type RENAME TO {schema}.{table};
 
 
-    """.format(schema=config['schema'], table=config['table'], column_list=',\n'.join(column_list))
+    """.format(schema=config['schema'], table=config['table'], column_list=',\n\t\t'.join(column_list))
     print(suggested_sql)
 
 
