@@ -205,10 +205,10 @@ def make_magic(config):
         );
         
         INSERT INTO {schema}.{table}_new_type SELECT * FROM {schema}.{table};
-        ANALYZE {table}_new_type;
+        ANALYZE {schema}.{table}_new_type;
 
-        ALTER TABLE {schema}.{table} RENAME TO {schema}.{table}_old;
-        ALTER TABLE {schema}.{table}_new_type RENAME TO {schema}.{table};
+        ALTER TABLE {schema}.{table} RENAME TO {table}_old;
+        ALTER TABLE {schema}.{table}_new_type RENAME TO {table};
 
 
     """.format(schema=config['schema'], table=config['table'], column_list=',\n\t\t'.join(column_list))
