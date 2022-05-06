@@ -45,6 +45,7 @@ WEIGHTS = {
 }
 
 compressions = {
+    'NONE': [1],
     'RLE_TYPE': [1, 2, 3, 4],
     'ZLIB': [1, 5, 9],
     'ZSTD': [1, 10, 19]
